@@ -7,6 +7,8 @@ from . import schemas, version_constants
 
 __all__ = ['DatabaseManager']
 
+from .schemas import User
+
 logger = logging.getLogger(version_constants.API_NAME)
 
 
@@ -27,16 +29,21 @@ class DatabaseManager:
             bind=engine if engine else self.engine, autoflush=False
         )()
 
-    def create_user_from_front(self, name: str, gender: str, age: int):
-        with self.create_session() as db:
-            new_user = schemas.User(
+    def create_user_from_front(self, name, gender, age):
+        with self.create_session() as db_session:
+            existing_user = db_session.query(User).filter_by(
                 first_name=name,
                 gender=gender,
                 age=age
-            )
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
+            ).first()
+
+            if existing_user:
+                return existing_user
+
+            new_user = User(first_name=name, gender=gender, age=age)
+            db_session.add(new_user)
+            db_session.commit()
+            db_session.refresh(new_user)
             return new_user
 
     def save_message(self, session_id: int, sender: str, text: str, tokens: int = 0):
@@ -103,3 +110,11 @@ class DatabaseManager:
             db.commit()
             db.refresh(new_session)
             return new_session.id
+
+    def get_messages_by_session(self, session_id: int, limit: int = 50):
+        with self.create_session() as db:
+            return db.query(schemas.Message) \
+                .filter_by(session_id=session_id) \
+                .order_by(schemas.Message.created_at.asc()) \
+                .limit(limit) \
+                .all()
