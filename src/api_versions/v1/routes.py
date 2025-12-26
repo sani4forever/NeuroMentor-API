@@ -2,6 +2,8 @@
 Routes for API version 1.
 """
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, Response, status, HTTPException
 from . import crud, models, version_constants
 from src.ai_api.deepseek import DeepSeekAPI
@@ -53,7 +55,7 @@ async def chat_with_ai(req: models.ChatRequest):
         else:
             db.get_or_create_session(current_session_id, req.user_id)
 
-        history = db.get_session_history(current_session_id)
+        history = db.get_session_history(current_session_id, limit=10)
 
         db.save_message(current_session_id, sender="user", text=req.message)
 
@@ -79,3 +81,25 @@ async def chat_with_ai(req: models.ChatRequest):
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@main_router.get('/chat/history/{user_id}', response_model=models.HistoryResponse)
+async def get_chat_history(user_id: int, session_id: Optional[int] = None):
+    try:
+        target_session_id = session_id
+        if not target_session_id or target_session_id == 0:
+            target_session_id = db.get_user_last_session(user_id)
+
+        if not target_session_id:
+            return {"session_id": 0, "messages": []}
+
+        messages = db.get_messages_by_session(target_session_id)
+
+        return {
+            "session_id": target_session_id,
+            "messages": messages
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal Server Error")

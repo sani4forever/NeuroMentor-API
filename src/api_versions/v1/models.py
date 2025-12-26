@@ -30,9 +30,6 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-from pydantic import BaseModel
-
-
 class ChatRequest(BaseModel):
     user_id: int
     session_id: int
@@ -44,3 +41,16 @@ class AIResponse(BaseModel):
 
 class Error(BaseModel):
     error: str
+
+class MessageResponse(BaseModel):
+    id: int
+    sender: str
+    message_text: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class HistoryResponse(BaseModel):
+    session_id: int
+    messages: list[MessageResponse]
